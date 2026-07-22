@@ -1,6 +1,17 @@
 server:
-  port: 8080
+  port: 8081
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
 
 spring:
   application:
     name: drug-safety-system
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/drug_safety?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false
+    username: root
+    password: Wxh041230
+    driver-class-name: com.mysql.cj.jdbc.Driver
