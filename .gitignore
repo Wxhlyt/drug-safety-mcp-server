@@ -95,6 +95,18 @@ drug-safety-system/external-data/
 /*.pdf
 /*.pptx
 /*.png
+*.bak
+/_*.py
+/_*.ps1
+/_*.txt
+/audit_*.py
+/fix_*.py
+/format_*.py
+/make_page_contacts.py
+/read_chinese_abstract.py
+/update_*.py
+/tmp_attachment2_format/
+/《智能医学工程课程设计》考核方案.md
 
 # TAE
 .trae/
