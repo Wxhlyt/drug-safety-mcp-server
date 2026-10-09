@@ -7,6 +7,14 @@ export function getAdverseReactionList() {
   })
 }
 
+export function getAdverseReactionPage(params) {
+  return request({
+    url: '/adverse-reaction/page',
+    method: 'get',
+    params
+  })
+}
+
 export function getAdverseReactionById(id) {
   return request({
     url: `/adverse-reaction/${id}`,

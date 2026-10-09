@@ -8,6 +8,13 @@ export function analyzeAiRisk(data) {
   })
 }
 
+export function analyzeSourceEvidence(drugId) {
+  return request({
+    url: `/ai-risk/${drugId}/source-analysis`,
+    method: 'get'
+  })
+}
+
 export function getAiRiskList() {
   return request({
     url: '/ai-risk/list',

@@ -2,8 +2,9 @@ import request from '../utils/request'
 
 export function getDrugList() {
   return request({
-    url: '/drug/list',
-    method: 'get'
+    url: '/drug/page',
+    method: 'get',
+    params: { page: 1, size: 1 }
   })
 }
 

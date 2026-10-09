@@ -66,4 +66,5 @@ public class AdverseReactionRecord extends BaseEntity {
      */
     @TableField("status")
     private Integer status;
+
 }

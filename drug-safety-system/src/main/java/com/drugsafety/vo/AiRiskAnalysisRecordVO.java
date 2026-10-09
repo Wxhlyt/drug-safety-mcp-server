@@ -3,6 +3,7 @@ package com.drugsafety.vo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -26,9 +27,33 @@ public class AiRiskAnalysisRecordVO {
     private Long drugId;
 
     /**
-     * AI分析内容
+     * 药品名称（规则分析时一并返回，便于前端展示）
      */
-    @Schema(description = "AI分析内容")
+    @Schema(description = "药品名称")
+    private String drugName;
+
+    /**
+     * 风险等级：LOW(低)/MEDIUM(中)/HIGH(高)
+     */
+    @Schema(description = "风险等级：LOW(低)/MEDIUM(中)/HIGH(高)")
+    private String riskLevel;
+
+    /**
+     * 风险评分，范围 0.00-100.00（由后端规则计算，结果可复现）
+     */
+    @Schema(description = "风险评分")
+    private BigDecimal riskScore;
+
+    /**
+     * 风险原因说明（基于实际数据生成）
+     */
+    @Schema(description = "风险原因说明")
+    private String riskReason;
+
+    /**
+     * 分析内容
+     */
+    @Schema(description = "分析内容")
     private String analysisContent;
 
     /**

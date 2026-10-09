@@ -11,7 +11,7 @@ spring:
     name: drug-safety-system
 
   datasource:
-    url: jdbc:mysql://localhost:3306/drug_safety?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false
-    username: root
-    password: Wxh041230
+    url: "${DB_URL:jdbc:mysql://localhost:3306/drug_safety?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}"
+    username: "${DB_USERNAME:root}"
+    password: "${DB_PASSWORD}"
     driver-class-name: com.mysql.cj.jdbc.Driver

@@ -24,7 +24,7 @@ const menuList = [
   { path: '/drug', title: '药品信息管理', icon: 'FirstAidKit' },
   { path: '/drug-risk', title: '药品风险管理', icon: 'Warning' },
   { path: '/adverse', title: '不良反应管理', icon: 'WarningFilled' },
-  { path: '/ai-risk', title: 'AI风险分析', icon: 'Cpu', roles: ['ADMIN'] },
+  { path: '/ai-risk', title: '来源证据分析', icon: 'Cpu', roles: ['ADMIN'] },
   { path: '/user', title: '用户管理', icon: 'User', roles: ['ADMIN'] },
   { path: '/role', title: '角色管理', icon: 'UserFilled', roles: ['ADMIN'] }
 ]

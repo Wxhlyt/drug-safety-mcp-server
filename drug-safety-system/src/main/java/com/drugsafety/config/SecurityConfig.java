@@ -16,6 +16,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.nio.charset.StandardCharsets;
 
@@ -28,6 +29,9 @@ import java.nio.charset.StandardCharsets;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Value("${drug-safety.agent-token-file:../drug-safety-mcp/.agent-token}")
+    private String agentTokenFile;
 
     /**
      * 白名单路径，无需认证即可访问
@@ -50,9 +54,16 @@ public class SecurityConfig {
                 // 配置请求授权
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(WHITE_LIST).permitAll()
+                        // Separate loopback-only machine identity. Existing user/admin rules are unchanged.
+                        .requestMatchers(HttpMethod.GET, "/agent-query/**").hasAuthority("AGENT_READ")
+                        .requestMatchers("/agent-query/**").denyAll()
                         .requestMatchers(HttpMethod.OPTIONS).permitAll()
                         // 管理员专属接口
                         .requestMatchers("/user/**", "/role/**", "/ai-risk/**").hasRole("ADMIN")
+                        // 基础业务数据仅允许管理员维护，普通登录用户只可查询
+                        .requestMatchers(HttpMethod.POST, "/drug/**", "/drug-risk/**", "/adverse-reaction/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/drug/**", "/drug-risk/**", "/adverse-reaction/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/drug/**", "/drug-risk/**", "/adverse-reaction/**").hasRole("ADMIN")
                         // 基础业务数据接口，登录用户均可访问
                         .requestMatchers("/drug/**", "/drug-risk/**", "/adverse-reaction/**").authenticated()
                         // 其他接口需要登录
@@ -82,7 +93,8 @@ public class SecurityConfig {
                 // 禁用 HTTP Basic
                 .httpBasic(AbstractHttpConfigurer::disable)
                 // 添加 JWT 过滤器
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new AgentTokenAuthenticationFilter(agentTokenFile), JwtAuthenticationFilter.class);
 
         return http.build();
     }

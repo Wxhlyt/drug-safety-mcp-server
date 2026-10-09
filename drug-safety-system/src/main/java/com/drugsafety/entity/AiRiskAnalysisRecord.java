@@ -6,6 +6,7 @@ import com.drugsafety.common.BaseEntity;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -24,6 +25,18 @@ public class AiRiskAnalysisRecord extends BaseEntity {
      */
     @TableField("drug_id")
     private Long drugId;
+
+    /**
+     * 风险等级：HIGH(高)/MEDIUM(中)/LOW(低)
+     */
+    @TableField("risk_level")
+    private String riskLevel;
+
+    /**
+     * 风险评分，范围 0.00-100.00
+     */
+    @TableField("risk_score")
+    private BigDecimal riskScore;
 
     /**
      * AI分析内容

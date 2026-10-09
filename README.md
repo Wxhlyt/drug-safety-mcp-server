@@ -1,395 +1,81 @@
-# 智能药品安全管理系统
+# 药品安全管理系统
 
-**Drug Safety Management System**
+这是一个本科课程设计原型，用于演示药品信息管理、来源证据追溯和本地只读 MCP 工具调用。项目不面向真实医疗环境，不提供诊断、处方、剂量建议或临床风险结论。
 
----
+> 当前状态快照：2026-10-09。实现、验证与计划的边界见 [ROADMAP.md](ROADMAP.md)。
 
-## 一、项目简介
+## 当前实现
 
-### 1.1 项目介绍
+- **基础管理系统**：Spring Boot 后端与 Vue 前端，包含用户认证与角色权限、药品信息、风险记录、不良反应记录及规则化风险分析。
+- **来源证据状态分析**：展示导入来源、FRDB 原始记录数量及来源链接，并区分 DailyMed 映射状态。只有唯一的 `MATCHED` 映射才作为已确认标签展示；其他状态不提供已确认标签。
+- **本地 MCP 服务**：Node.js stdio 服务提供 `search_drug`、`get_drug_profile`、`get_safety_evidence` 三个只读工具，限制在 30 种演示药品。服务访问本机 Spring 接口，不直接连接数据库。
 
-本系统是基于 **Spring Boot + Vue3** 的智能药品安全管理系统，面向药品信息管理、药品风险管理、不良反应记录以及风险分析场景设计。系统采用前后端分离架构，后端提供 RESTful API，前端通过 Vue3 实现交互式管理界面。
+风险分析按固定规则处理系统记录；它不是 AI 模型或临床审查。MCP 工具展示来源与原始证据，不会把 `ddi_target` 等字段解释为患者个体用药结论。CLI 工具、临床核查工具和 CLI/MCP 对比实验尚未实现。
 
-### 1.2 项目说明
+## 目录
 
-本项目为**广东药科大学智能医学工程专业本科课程设计项目**，用于学习智能医学工程领域的信息系统设计与开发方法。项目重点实践 Java Web 后端开发、Vue3 前端开发、数据库设计、JWT 认证、RBAC 权限控制等技术，不用于真实医疗环境部署。
+| 路径 | 内容 |
+| --- | --- |
+| `drug-safety-system/` | Spring Boot API、数据库结构和 Java 测试 |
+| `drug-safety-system-ui/` | Vue 前端及来源字段翻译测试 |
+| `drug-safety-mcp/` | 本地 MCP 服务、令牌初始化与端到端冒烟测试 |
+| `ROADMAP.md` | 实现状态、验证记录和后续计划 |
 
----
+FRDB、DailyMed 原始文件和本地数据库不随代码库提供。使用来源证据与 MCP 查询前，需在本机配置数据库并导入所需演示数据。
 
-## 项目背景
+## 本地运行
 
-药品安全管理是医学信息化建设中的基础应用场景。随着医药行业数据量的增长，传统的手工记录方式难以满足药品信息维护、风险记录追踪和不良反应统计的需求。因此，通过信息系统对药品基础信息、风险记录和不良反应事件进行规范化管理，是提升药品安全数据管理效率的重要途径。
+### 环境
 
-本系统围绕药品安全管理场景设计，重点实现以下信息化需求：
+- JDK 21、Maven 3.8+
+- MySQL 8
+- Node.js 20.19+ 或 22.12+
 
-- **药品信息管理**：对药品名称、通用名称、分类、剂型、规格、生产厂家等基础信息进行结构化存储和维护；
-- **风险记录管理**：记录药品风险评估信息，包括风险等级、风险评分和风险原因，形成可追溯的风险记录；
-- **不良反应管理**：记录药品不良反应事件，包括症状、严重程度、发生时间、处理措施等，便于后续查询与分析；
-- **风险分析支持**：通过规则化方法对药品数据进行模拟分析，生成风险分析文本和建议，辅助理解医学信息系统中的数据处理流程。
+### 后端
 
-本项目作为课程设计作品，将上述需求转化为可运行的信息系统功能，用于学习医学信息系统的设计与开发方法。
+先按 `drug-safety-system/src/main/resources/db/` 下的 SQL 文件准备本地数据库。通过环境变量提供数据库连接和 JWT 签名密钥；不要把凭据写入源码、配置文件或提交历史。
 
----
+PowerShell 示例（请在当前终端中填入自己的值，不要提交到 Git）：
 
-## 二、项目特点
-
-- **前后端分离架构**：Spring Boot 后端 + Vue3 前端，职责清晰，便于学习维护
-- **JWT 用户认证**：无状态 Token 认证，支持登录态持久化
-- **Spring Security 权限控制**：基于角色的接口访问控制
-- **RBAC 角色管理**：管理员与普通用户角色区分，实现基础权限管理
-- **药品信息管理**：药品基础信息的增删改查、分页与搜索
-- **药品风险管理**：药品风险记录、风险等级、风险评分与风险原因管理
-- **不良反应管理**：不良反应事件的结构化记录与查询
-- **AI 风险分析模块（规则模拟）**：基于规则生成风险分析文本和建议，用于展示医学信息系统数据分析流程
-
-> **说明**：当前 AI 风险分析模块为课程设计阶段的规则化模拟实现，不涉及真实 AI 模型训练，不属于真实医疗 AI 系统。
-
----
-
-## 三、技术栈
-
-### 3.1 后端技术
-
-| 技术 | 版本 | 说明 |
-|------|------|------|
-| Java | 21 | 编程语言 |
-| Spring Boot | 3.3.5 | Web 应用框架 |
-| MyBatis-Plus | 3.5.9 | 数据库访问层 |
-| Spring Security | 6.x | 安全认证与授权 |
-| JWT | 0.12.6 | 无状态身份认证 |
-| MySQL | 8.0 | 关系型数据库 |
-| Maven | 3.x | 项目构建工具 |
-| Swagger / SpringDoc | 2.6.0 | 接口文档生成 |
-| Lombok | 1.18.34 | 简化实体类代码 |
-| Spring Validation | - | 参数校验 |
-
-### 3.2 前端技术
-
-| 技术 | 版本 | 说明 |
-|------|------|------|
-| Vue | 3.5.39 | 前端框架 |
-| Vite | 8.1.1 | 构建工具 |
-| Element Plus | 2.14.3 | UI 组件库 |
-| Vue Router | 5.2.0 | 路由管理 |
-| Pinia | 4.0.2 | 状态管理 |
-| Axios | 1.18.1 | HTTP 请求库 |
-| ECharts | 6.1.0 | 图表可视化 |
-
----
-
-## 四、系统功能模块
-
-### 4.1 用户认证与权限管理
-
-- 用户登录认证
-- JWT Token 生成与校验
-- 用户信息的增删改查
-- 角色信息的增删改查
-- 用户角色分配
-- 基于 RBAC 的接口权限控制
-
-### 4.2 药品信息管理
-
-- 药品新增、查询、修改、删除
-- 药品名称、通用名称、分类、剂型、规格等字段管理
-- 分页查询与搜索
-
-### 4.3 药品风险管理
-
-- 药品风险记录的新增、查询、修改、删除
-- 风险等级（低/中/高/未知）维护
-- 风险评分与风险原因记录
-
-### 4.4 不良反应管理
-
-- 不良反应记录的新增、查询、修改、删除
-- 症状、严重程度、发生时间、报告人、处理措施记录
-- 与药品信息关联查询
-
-### 4.5 AI 风险分析
-
-- 基于规则的药品风险分析模拟
-- 生成风险分析内容与建议
-- 分析历史记录查询与管理
-
-> **说明**：本模块为规则驱动的模拟分析，主要用于展示医学信息系统中的数据分析流程，为后续学习机器学习和人工智能方法奠定概念基础。
-
----
-
-## 需求分析
-
-### 用户需求
-
-#### 管理员
-
-- 用户管理：管理系统用户账号信息，包括新增、编辑、禁用用户；
-- 角色管理：维护系统角色信息，区分不同操作权限；
-- 权限控制：通过角色分配控制用户可访问的功能模块；
-- 药品信息维护：对药品基础信息进行新增、修改、删除和查询；
-- 风险分析管理：执行药品风险分析模拟，查看和管理分析记录。
-
-#### 普通用户
-
-- 查看药品信息：浏览和搜索药品基础信息；
-- 查询风险记录：查看药品历史风险记录；
-- 维护不良反应信息：新增、查询和编辑药品不良反应记录。
-
-### 功能需求
-
-- **用户认证**：支持用户通过用户名和密码登录，登录成功后返回 JWT Token；
-- **权限管理**：基于 RBAC 模型实现用户角色分配和接口权限控制；
-- **药品管理**：实现药品基础信息的增删改查、分页展示和搜索；
-- **药品风险管理**：记录药品风险信息，支持风险等级、评分和原因维护；
-- **不良反应管理**：记录不良反应事件，支持症状、严重程度、处理措施等字段管理；
-- **智能风险分析**：基于规则对药品数据进行模拟分析，生成分析结果和建议。
-
-> **说明**：智能风险分析功能为课程设计阶段的规则化模拟，不涉及真实 AI 模型训练。
-
----
-
-## 五、项目结构
-
-```
-课程设计
-├── drug-safety-system                  # Spring Boot 后端项目
-│   ├── src/main/java/com/drugsafety/   # Java 源代码
-│   │   ├── common/                     # 公共组件（Result、BaseEntity、全局异常等）
-│   │   ├── config/                     # 安全配置、JWT 过滤器
-│   │   ├── controller/                 # 控制器层
-│   │   ├── dto/                        # 数据传输对象
-│   │   ├── entity/                     # 数据库实体类
-│   │   ├── exception/                  # 异常处理
-│   │   ├── mapper/                     # 数据访问层
-│   │   ├── service/                    # 业务逻辑层
-│   │   │   └── impl/                   # 业务实现类
-│   │   ├── utils/                      # 工具类
-│   │   └── vo/                         # 视图对象
-│   ├── src/main/resources/
-│   │   ├── application.yml             # 应用配置文件
-│   │   └── db/                         # 数据库脚本
-│   └── pom.xml                         # Maven 配置文件
-│
-└── drug-safety-system-ui               # Vue3 前端项目
-    ├── src/
-    │   ├── api/                        # 后端接口封装
-    │   ├── layouts/                    # 页面布局组件
-    │   ├── router/                     # 路由配置
-    │   ├── store/                      # Pinia 状态管理
-    │   ├── utils/                      # 工具函数（Axios 封装）
-    │   ├── views/                      # 页面视图
-    │   ├── App.vue                     # 根组件
-    │   ├── main.js                     # 入口文件
-    │   └── style.css                   # 全局样式
-    ├── package.json                    # 项目依赖
-    └── vite.config.js                  # Vite 配置文件
-```
-
----
-
-## 六、数据库设计
-
-### 6.1 数据库信息
-
-- **数据库名称**：`drug_safety`
-- **字符集**：`utf8mb4`
-- **排序规则**：`utf8mb4_unicode_ci`
-
-### 6.2 主要数据表
-
-| 表名 | 说明 |
-|------|------|
-| `sys_user` | 用户表，存储系统用户基础信息 |
-| `sys_role` | 角色表，存储系统角色信息 |
-| `sys_user_role` | 用户角色关联表，实现用户与角色的多对多关联 |
-| `drug_info` | 药品信息表，存储药品基础信息 |
-| `drug_risk_record` | 药品风险记录表，存储药品风险评估历史 |
-| `adverse_reaction_record` | 不良反应记录表，存储不良反应事件 |
-| `ai_risk_analysis_record` | AI 风险分析记录表，存储规则化分析结果 |
-
-### 6.3 表关系说明
-
-- `sys_user` 与 `sys_role` 通过 `sys_user_role` 建立多对多关联
-- `drug_info` 是核心主表，`drug_risk_record`、`adverse_reaction_record`、`ai_risk_analysis_record` 均通过 `drug_id` 与 `drug_info` 形成一对多关联
-- 所有数据表均包含 `id`、`create_time`、`update_time` 基础字段
-
----
-
-## 七、运行环境
-
-| 环境 | 要求 |
-|------|------|
-| JDK | 21 |
-| Maven | 3.8 及以上 |
-| Node.js | 18 及以上 |
-| MySQL | 8.0 |
-| 数据库字符集 | utf8mb4 |
-
----
-
-## 八、项目运行
-
-### 8.1 后端启动
-
-#### 1. 创建数据库
-
-```sql
-CREATE DATABASE IF NOT EXISTS drug_safety
-    DEFAULT CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-```
-
-#### 2. 执行数据库初始化脚本
-
-进入后端项目目录 `drug-safety-system/src/main/resources/db/`，按以下顺序执行 SQL 脚本：
-
-```sql
--- 1. 创建用户、角色、用户角色关联表
-source schema-user.sql
-
--- 2. 创建药品信息表
-source schema-drug-info.sql
-
--- 3. 创建药品风险记录表
-source schema-drug-risk.sql
-
--- 4. 创建不良反应记录表
-source schema-adverse-reaction.sql
-
--- 5. 创建 AI 风险分析记录表
-source schema-ai-risk.sql
-
--- 6. 初始化基础角色
-source init-roles.sql
-
--- 7. 初始化管理员账号
-source init-admin.sql
-
--- 8. 导入测试数据（可选）
-source init-test-data.sql
-```
-
-#### 3. 修改数据库配置
-
-编辑 `drug-safety-system/src/main/resources/application.yml`，修改数据库连接信息：
-
-```yaml
-spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/drug_safety?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false
-    username: root
-    password: 你的数据库密码
-```
-
-#### 4. 启动后端服务
-
-```bash
-cd drug-safety-system
+```powershell
+$env:DB_URL = 'jdbc:mysql://localhost:3306/drug_safety?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true'
+$env:DB_USERNAME = 'root'
+$env:DB_PASSWORD = '<本机数据库密码>'
+$env:JWT_SECRET = '<至少 32 个 UTF-8 字节的随机密钥>'
+Set-Location .\drug-safety-system
 mvn spring-boot:run
 ```
 
-后端服务地址：
+`JWT_SECRET` 缺失或短于 32 字节时，JWT 工具会拒绝初始化。首次初始化数据库后，应立即为种子管理员设置本机专用密码；不要将演示凭据用于共享或生产环境。
 
-```
-http://localhost:8081
-```
+### 前端
 
-Swagger 接口文档地址：
-
-```
-http://localhost:8081/swagger-ui/index.html
-```
-
-### 8.2 前端启动
-
-#### 1. 安装依赖
-
-```bash
-cd drug-safety-system-ui
-npm install
-```
-
-#### 2. 启动开发服务器
-
-```bash
+```powershell
+Set-Location .\drug-safety-system-ui
+npm ci
 npm run dev
 ```
 
-#### 3. 访问系统
+### 本地 MCP
 
-浏览器打开：
+请先运行后端，并确认本机数据库已导入演示范围内的数据，再按 [drug-safety-mcp/README.md](drug-safety-mcp/README.md) 创建本地令牌、注册 MCP 服务并运行冒烟测试。令牌文件、日志和下载的数据不会进入 Git。
 
+## 验证命令
+
+```powershell
+# 后端 Java 测试
+Set-Location .\drug-safety-system
+mvn test
+
+# 前端来源字段翻译测试与生产构建
+Set-Location ..\drug-safety-system-ui
+node --test test/sourceTranslations.test.js
+npm run build
+
+# MCP 冒烟测试（需本机后端、数据库和演示数据）
+Set-Location ..\drug-safety-mcp
+npm ci
+npm run smoke-test
 ```
-http://localhost:5173
-```
 
-### 8.3 测试账号
-
-| 用户名 | 密码 | 角色 |
-|--------|------|------|
-| wxhlyt | Wxh041230 | 管理员 |
-
----
-
-## 九、系统展示
-
-> 以下为本系统主要页面展示区域，可在项目展示或答辩时补充对应截图。
-
-### 9.1 登录页面
-
-![登录页面](./docs/screenshots/login.png)
-
-### 9.2 首页 Dashboard
-
-![首页 Dashboard](./docs/screenshots/home.png)
-
-### 9.3 药品信息管理
-
-![药品信息管理](./docs/screenshots/drug.png)
-
-### 9.4 药品风险管理
-
-![药品风险管理](./docs/screenshots/drug-risk.png)
-
-### 9.5 不良反应管理
-
-![不良反应管理](./docs/screenshots/adverse.png)
-
-### 9.6 AI 风险分析
-
-![AI 风险分析](./docs/screenshots/ai-risk.png)
-
----
-
-## 十、课程设计总结
-
-### 10.1 系统设计过程
-
-本项目围绕药品安全管理场景，按照信息系统开发的基本流程完成需求分析、数据库设计、后端开发、前端开发和功能测试。系统设计以药品信息为核心，通过 `drug_id` 将风险记录、不良反应记录和分析记录进行关联，形成基础的数据追溯能力。
-
-### 10.2 技术应用
-
-- 后端采用 Spring Boot 3 + MyBatis-Plus 构建三层架构应用
-- 使用 Spring Security + JWT 实现无状态认证和基于角色的访问控制
-- 使用 Vue3 + Element Plus 构建后台管理系统界面
-- 使用 ECharts 实现首页数据可视化
-- 使用 MySQL 8.0 进行结构化数据存储
-
-### 10.3 实现功能
-
-系统已实现了用户认证、用户管理、角色管理、药品信息管理、药品风险管理、不良反应管理、AI 风险分析记录管理等模块，能够支撑课程设计展示和答辩需求。
-
-### 10.4 存在不足
-
-- 风险分析模块目前基于规则实现，尚未接入真实数据分析方法
-- 系统主要面向单机演示，未涉及分布式部署、缓存、消息队列等企业级技术
-- 前端界面以功能实现为主，可进一步优化交互体验
-
-### 10.5 未来优化方向
-
-- 在掌握机器学习和数据分析方法后，可探索更丰富的医学数据分析功能
-- 可进一步完善前端交互细节和响应式布局
-- 可学习并引入单元测试、接口测试等软件工程实践方法
-
----
-
-> **项目定位声明**：本系统为课程设计阶段的信息系统原型，用于学习智能医学工程中的医学数据管理与信息系统设计方法，不用于真实医疗环境部署。
+2026-10-09 已重新运行后端默认测试（40 项通过）、前端测试（3 项通过）和前端构建；数据库集成测试与 MCP 端到端冒烟测试尚未在本次运行。逐项状态见 [ROADMAP.md](ROADMAP.md)。

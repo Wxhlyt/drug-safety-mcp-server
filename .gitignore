@@ -56,6 +56,12 @@ out/
 
 # Node.js
 node_modules/
+drug-safety-mcp/.env
+drug-safety-mcp/.agent-token
+drug-safety-mcp/logs/
+.env
+.env.*
+!.env.example
 dist/
 dist-ssr/
 npm-debug.log*
@@ -70,6 +76,25 @@ Thumbs.db
 # Database
 *.sql.bak
 *.sql~
+
+# Local configuration and source data; never commit credentials or downloaded source archives
+drug-safety-system/src/main/resources/application-local.yml
+drug-safety-system/external-data/
+
+# Course documents, research drafts, presentations and QA exports belong outside this code repository
+/docs/
+/.codex/
+/.demo-runtime/
+/tools/
+/启动与停止/
+/_*/
+/qa_*/
+/docx_render*/
+/tmp/
+/*.docx
+/*.pdf
+/*.pptx
+/*.png
 
 # TAE
 .trae/

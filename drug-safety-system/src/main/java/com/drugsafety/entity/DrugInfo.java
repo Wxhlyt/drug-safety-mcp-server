@@ -107,4 +107,23 @@ public class DrugInfo extends BaseEntity {
      */
     @TableField("status")
     private Integer status;
+
+    /** External catalog provenance. FRDB records are read-only in this application. */
+    @TableField("data_source")
+    private String dataSource;
+
+    @TableField("external_batch_id")
+    private Long externalBatchId;
+
+    @TableField("external_compound_id")
+    private Long externalCompoundId;
+
+    @TableField("external_unii")
+    private String externalUnii;
+
+    @TableField("source_read_only")
+    private Boolean sourceReadOnly;
+
+    @TableField("data_quality_status")
+    private String dataQualityStatus;
 }

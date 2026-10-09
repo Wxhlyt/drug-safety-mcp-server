@@ -2,7 +2,8 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAppStore } from '../../store'
-import { getDrugList, createDrug, updateDrug, deleteDrug } from '../../api/drug'
+import { getDrugPage, createDrug, updateDrug, deleteDrug, getExternalDrugOverview, getExternalDrugDdi, getExternalDrugAdverse } from '../../api/drug'
+import { formatSourceTerm } from '../../utils/sourceTranslations'
 
 const appStore = useAppStore()
 const isAdmin = computed(() => (appStore.userInfo?.roles || []).includes('ADMIN'))
@@ -12,6 +13,19 @@ const drugList = ref([])
 const searchQuery = ref('')
 const currentPage = ref(1)
 const pageSize = ref(10)
+const total = ref(0)
+const sourceFilter = ref('')
+const qualityFilter = ref('')
+
+const evidenceVisible = ref(false)
+const evidenceLoading = ref(false)
+const externalEvidence = ref(null)
+const externalDrugId = ref(null)
+const evidencePageSize = 10
+const ddiPage = ref(1)
+const adversePage = ref(1)
+const ddiLoading = ref(false)
+const adverseLoading = ref(false)
 
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
@@ -57,9 +71,16 @@ const resetForm = () => {
 const fetchList = async () => {
   loading.value = true
   try {
-    const res = await getDrugList()
+    const res = await getDrugPage({
+      page: currentPage.value,
+      size: pageSize.value,
+      keyword: searchQuery.value.trim() || undefined,
+      source: sourceFilter.value || undefined,
+      quality: qualityFilter.value || undefined
+    })
     if (res.code === 200) {
-      drugList.value = res.data || []
+      drugList.value = res.data?.items || []
+      total.value = res.data?.total || 0
     } else {
       ElMessage.error(res.message || '查询失败')
     }
@@ -70,34 +91,70 @@ const fetchList = async () => {
   }
 }
 
-const filteredDrugList = computed(() => {
-  const keyword = searchQuery.value.trim().toLowerCase()
-  if (!keyword) return drugList.value
-  return drugList.value.filter(drug =>
-    (drug.drugName && drug.drugName.toLowerCase().includes(keyword)) ||
-    (drug.genericName && drug.genericName.toLowerCase().includes(keyword))
-  )
-})
-
-const total = computed(() => filteredDrugList.value.length)
-
-const paginatedDrugList = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return filteredDrugList.value.slice(start, end)
-})
-
 const handleSearch = () => {
   currentPage.value = 1
+  fetchList()
+}
+
+const getQualityLabel = (row) => {
+  if (row.dataQualityStatus === 'FRDB_SOURCE_ONLY') return 'FRDB 基础数据'
+  return row.dataQualityStatus || '本地维护'
 }
 
 const handleSizeChange = (size) => {
   pageSize.value = size
   currentPage.value = 1
+  fetchList()
 }
 
 const handleCurrentChange = (page) => {
   currentPage.value = page
+  fetchList()
+}
+
+const openExternalEvidence = async (row) => {
+  evidenceVisible.value = true
+  evidenceLoading.value = true
+  externalEvidence.value = null
+  externalDrugId.value = row.id
+  ddiPage.value = 1
+  adversePage.value = 1
+  try {
+    const [overview, ddi, adverse] = await Promise.all([
+      getExternalDrugOverview(row.id),
+      getExternalDrugDdi(row.id, { page: 1, size: 10 }),
+      getExternalDrugAdverse(row.id, { page: 1, size: 10 })
+    ])
+    externalEvidence.value = { overview: overview.data, ddi: ddi.data, adverse: adverse.data }
+  } catch (error) {
+    evidenceVisible.value = false
+  } finally {
+    evidenceLoading.value = false
+  }
+}
+
+const loadDdiPage = async (page) => {
+  if (!externalDrugId.value || !externalEvidence.value) return
+  ddiLoading.value = true
+  try {
+    const res = await getExternalDrugDdi(externalDrugId.value, { page, size: evidencePageSize })
+    externalEvidence.value.ddi = res.data
+    ddiPage.value = res.data.page
+  } finally {
+    ddiLoading.value = false
+  }
+}
+
+const loadAdversePage = async (page) => {
+  if (!externalDrugId.value || !externalEvidence.value) return
+  adverseLoading.value = true
+  try {
+    const res = await getExternalDrugAdverse(externalDrugId.value, { page, size: evidencePageSize })
+    externalEvidence.value.adverse = res.data
+    adversePage.value = res.data.page
+  } finally {
+    adverseLoading.value = false
+  }
 }
 
 const handleAdd = () => {
@@ -200,30 +257,38 @@ onMounted(() => {
         @keyup.enter="handleSearch"
       />
       <el-button type="primary" @click="handleSearch">搜索</el-button>
+      <el-select v-model="sourceFilter" clearable placeholder="数据来源" style="width: 130px" @change="handleSearch">
+        <el-option label="FRDB" value="FRDB" />
+        <el-option label="本地" value="LOCAL" />
+      </el-select>
+      <el-select v-model="qualityFilter" clearable placeholder="完整度" style="width: 160px" @change="handleSearch">
+        <el-option label="FRDB 基础数据" value="FRDB_SOURCE_ONLY" />
+      </el-select>
     </div>
 
-    <el-table :data="paginatedDrugList" v-loading="loading" border style="width: 100%">
-      <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column prop="drugName" label="药品名称" min-width="150" />
-      <el-table-column prop="genericName" label="通用名称" min-width="150" />
-      <el-table-column prop="drugCategory" label="药品分类" min-width="120" />
-      <el-table-column prop="categoryCode" label="分类编码" min-width="120" />
-      <el-table-column prop="dosageForm" label="剂型" min-width="120" />
-      <el-table-column prop="specification" label="规格" min-width="150" />
-      <el-table-column prop="manufacturer" label="生产厂家" min-width="150" />
-      <el-table-column prop="approvalNumber" label="批准文号" min-width="150" />
-      <el-table-column prop="riskLevel" label="风险等级" width="100" />
-      <el-table-column prop="status" label="状态" width="80">
+    <el-table :data="drugList" v-loading="loading" border style="width: 100%">
+      <el-table-column prop="drugName" label="药品名称" min-width="220" />
+      <el-table-column label="通用名 / UNII" min-width="240">
         <template #default="{ row }">
-          <el-tag :type="row.status === 1 ? 'success' : 'danger'">
-            {{ row.status === 1 ? '启用' : '禁用' }}
-          </el-tag>
+          <div>{{ row.genericName || '未提供' }}</div>
+          <small v-if="row.externalUnii">UNII: {{ row.externalUnii }}</small>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="150" fixed="right">
+      <el-table-column label="数据来源" width="120">
         <template #default="{ row }">
-          <el-button v-if="isAdmin" type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
-          <el-button v-if="isAdmin" type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+          <el-tag :type="row.dataSource === 'FRDB' ? 'info' : 'success'">{{ row.dataSource || 'LOCAL' }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="数据完整度" min-width="150">
+        <template #default="{ row }">
+          <el-tag :type="row.dataQualityStatus === 'FRDB_SOURCE_ONLY' ? 'warning' : 'success'">{{ getQualityLabel(row) }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="210" fixed="right">
+        <template #default="{ row }">
+          <el-button v-if="row.dataSource === 'FRDB'" type="primary" size="small" @click="openExternalEvidence(row)">查看详情</el-button>
+          <el-button v-if="isAdmin && !row.sourceReadOnly" type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+          <el-button v-if="isAdmin && !row.sourceReadOnly" type="danger" size="small" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -293,6 +358,82 @@ onMounted(() => {
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+
+    <el-drawer v-model="evidenceVisible" title="外部来源与原始证据（只读）" size="65%" destroy-on-close>
+      <div v-loading="evidenceLoading" v-if="externalEvidence">
+        <el-alert type="info" :closable="false" show-icon title="FRDB 原始数据只读展示；DailyMed 仅在唯一高置信匹配时显示标签版本。" />
+        <el-descriptions :column="2" border class="evidence-block">
+          <el-descriptions-item label="FRDB 化合物 ID">{{ externalEvidence.overview.external_compound_id }}</el-descriptions-item>
+          <el-descriptions-item label="UNII">{{ externalEvidence.overview.external_unii || '未提供' }}</el-descriptions-item>
+          <el-descriptions-item label="映射状态">{{ formatSourceTerm(externalEvidence.overview.mapping_status, 'mappingStatus') }}</el-descriptions-item>
+          <el-descriptions-item label="映射方法">{{ formatSourceTerm(externalEvidence.overview.match_method, 'matchMethod') }}</el-descriptions-item>
+          <el-descriptions-item label="FRDB 版本">{{ externalEvidence.overview.dataset_version }}</el-descriptions-item>
+          <el-descriptions-item label="数据质量">{{ formatSourceTerm(externalEvidence.overview.data_quality_status, 'dataQuality') }}</el-descriptions-item>
+          <el-descriptions-item label="FRDB 来源" :span="2"><el-link :href="externalEvidence.overview.frdb_source_url" target="_blank">{{ externalEvidence.overview.frdb_source_url }}</el-link></el-descriptions-item>
+          <el-descriptions-item v-if="externalEvidence.overview.dailymedLabel" label="DailyMed 标签版本" :span="2">
+            {{ externalEvidence.overview.dailymedLabel.spl_set_id }} / {{ externalEvidence.overview.dailymedLabel.spl_version }}
+            <el-link :href="externalEvidence.overview.dailymedLabel.source_url" target="_blank" class="source-link">官方原始 XML</el-link>
+          </el-descriptions-item>
+        </el-descriptions>
+        <template v-if="externalEvidence.overview.dailymedProducts?.length">
+          <h3>DailyMed 结构化产品信息</h3>
+          <el-table :data="externalEvidence.overview.dailymedProducts" border max-height="220">
+            <el-table-column prop="product_identifier" label="产品标识" min-width="130" />
+            <el-table-column prop="product_name" label="产品名称" min-width="170" />
+            <el-table-column prop="active_ingredients" label="活性成分" min-width="180" />
+            <el-table-column label="剂型" min-width="230" show-overflow-tooltip>
+              <template #default="{ row }">{{ formatSourceTerm(row.dosage_form, 'dosageForm') }}</template>
+            </el-table-column>
+            <el-table-column prop="strength_text" label="规格" min-width="130" />
+            <el-table-column prop="route_text" label="给药途径" min-width="120" />
+          </el-table>
+        </template>
+        <template v-if="externalEvidence.overview.dailymedSections?.length">
+          <h3>DailyMed 标签章节（原始文本节选）</h3>
+          <el-collapse>
+            <el-collapse-item v-for="section in externalEvidence.overview.dailymedSections" :key="section.section_sha256" :title="section.section_title">
+              <p class="section-text">{{ section.section_text }}</p>
+            </el-collapse-item>
+          </el-collapse>
+        </template>
+        <h3>FRDB 相互作用证据（共 {{ externalEvidence.ddi.total }} 条）</h3>
+        <el-table :data="externalEvidence.ddi.items" border max-height="240" v-loading="ddiLoading">
+          <el-table-column prop="ddi_target" label="靶点" min-width="160" />
+          <el-table-column label="关系" min-width="240" show-overflow-tooltip>
+            <template #default="{ row }">{{ formatSourceTerm(row.ddi_relation, 'ddiRelation') }}</template>
+          </el-table-column>
+          <el-table-column label="类型" min-width="160" show-overflow-tooltip>
+            <template #default="{ row }">{{ formatSourceTerm(row.ddi_type, 'ddiType') }}</template>
+          </el-table-column>
+          <el-table-column label="临床证据" min-width="300" show-overflow-tooltip>
+            <template #default="{ row }">{{ formatSourceTerm(row.ddi_clin_evidence, 'ddiEvidence') }}</template>
+          </el-table-column>
+        </el-table>
+        <el-pagination
+          v-if="externalEvidence.ddi.total > evidencePageSize"
+          small background layout="total, prev, pager, next"
+          :current-page="ddiPage" :page-size="evidencePageSize" :total="externalEvidence.ddi.total"
+          @current-change="loadDdiPage"
+        />
+        <h3>FRDB 不良反应证据（共 {{ externalEvidence.adverse.total }} 条）</h3>
+        <el-table :data="externalEvidence.adverse.items" border max-height="240" v-loading="adverseLoading">
+          <el-table-column label="严重程度" min-width="220" show-overflow-tooltip>
+            <template #default="{ row }">{{ formatSourceTerm(row.adverseevents_severity, 'adverseSeverity') }}</template>
+          </el-table-column>
+          <el-table-column label="类型" min-width="280" show-overflow-tooltip>
+            <template #default="{ row }">{{ formatSourceTerm(row.adverseevents_type, 'adverseType') }}</template>
+          </el-table-column>
+          <el-table-column prop="adverseevents_comment" label="原始说明（来源原文）" min-width="260" show-overflow-tooltip />
+          <el-table-column prop="toxicity_source_uri" label="来源 URI" min-width="220" show-overflow-tooltip />
+        </el-table>
+        <el-pagination
+          v-if="externalEvidence.adverse.total > evidencePageSize"
+          small background layout="total, prev, pager, next"
+          :current-page="adversePage" :page-size="evidencePageSize" :total="externalEvidence.adverse.total"
+          @current-change="loadAdversePage"
+        />
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -326,4 +467,8 @@ onMounted(() => {
   justify-content: flex-end;
   margin-top: 20px;
 }
+
+.evidence-block { margin-top: 16px; }
+.source-link { margin-left: 12px; }
+.section-text { white-space: pre-wrap; line-height: 1.7; }
 </style>

@@ -98,6 +98,24 @@ public class DrugInfoVO {
     @Schema(description = "状态：1-启用，0-禁用")
     private Integer status;
 
+    @Schema(description = "数据来源，例如 FRDB 或 LOCAL")
+    private String dataSource;
+
+    @Schema(description = "外部导入批次")
+    private Long externalBatchId;
+
+    @Schema(description = "外部化合物标识")
+    private Long externalCompoundId;
+
+    @Schema(description = "UNII")
+    private String externalUnii;
+
+    @Schema(description = "是否为只读外部来源")
+    private Boolean sourceReadOnly;
+
+    @Schema(description = "数据质量或补全状态")
+    private String dataQualityStatus;
+
     /**
      * 创建时间
      */

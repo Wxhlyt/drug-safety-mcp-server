@@ -6,6 +6,8 @@ import com.drugsafety.entity.AiRiskAnalysisRecord;
 import com.drugsafety.entity.DrugInfo;
 import com.drugsafety.service.AiRiskAnalysisRecordService;
 import com.drugsafety.service.DrugInfoService;
+import com.drugsafety.service.RiskAnalysisService;
+import com.drugsafety.service.SourceEvidenceAnalysisService;
 import com.drugsafety.vo.AiRiskAnalysisRecordVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,30 +16,23 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * AI风险分析记录管理控制器
+ * 风险分析记录管理控制器
  */
 @RestController
 @RequestMapping("/ai-risk")
 @RequiredArgsConstructor
-@Tag(name = "AI风险分析记录管理", description = "AI风险分析记录相关接口")
+@Tag(name = "风险分析记录管理", description = "风险分析记录相关接口")
 public class AiRiskAnalysisRecordController {
 
     private final AiRiskAnalysisRecordService aiRiskAnalysisRecordService;
+    private final RiskAnalysisService riskAnalysisService;
     private final DrugInfoService drugInfoService;
-
-    /**
-     * 将 DTO 转换为实体对象
-     */
-    private AiRiskAnalysisRecord convertToEntity(AiRiskAnalysisRecordDTO dto) {
-        AiRiskAnalysisRecord record = new AiRiskAnalysisRecord();
-        BeanUtils.copyProperties(dto, record);
-        return record;
-    }
+    private final SourceEvidenceAnalysisService sourceEvidenceAnalysisService;
 
     /**
      * 将实体对象转换为 VO
@@ -45,49 +40,33 @@ public class AiRiskAnalysisRecordController {
     private AiRiskAnalysisRecordVO convertToVO(AiRiskAnalysisRecord record) {
         AiRiskAnalysisRecordVO vo = new AiRiskAnalysisRecordVO();
         BeanUtils.copyProperties(record, vo);
+        // 补充药品名称：drugName 存储于 drug_info 表，需根据 drugId 单独查询
+        if (record.getDrugId() != null) {
+            DrugInfo drugInfo = drugInfoService.getById(record.getDrugId());
+            if (drugInfo != null) {
+                vo.setDrugName(drugInfo.getDrugName());
+            }
+        }
         return vo;
     }
 
-    /**
-     * 根据药品信息生成模拟AI风险分析内容
-     */
-    private void generateAnalysisContent(AiRiskAnalysisRecord record) {
-        DrugInfo drugInfo = drugInfoService.getById(record.getDrugId());
-        String drugName = drugInfo != null ? drugInfo.getDrugName() : "未知药品";
-
-        String analysisContent = String.format(
-                "基于规则分析，药品【%s】当前风险等级为 %s，" +
-                        "已关联 %d 条不良反应记录，" +
-                        "建议结合临床使用数据进一步评估。",
-                drugName,
-                drugInfo != null ? drugInfo.getRiskLevel() : "UNKNOWN",
-                0
-        );
-        String riskSuggestion = String.format(
-                "建议对药品【%s】加强用药监测，出现异常情况及时上报。",
-                drugName
-        );
-
-        record.setAnalysisContent(analysisContent);
-        record.setRiskSuggestion(riskSuggestion);
-        record.setAnalysisTime(LocalDateTime.now());
-    }
-
     @PostMapping("/analyze")
-    @Operation(summary = "根据药品信息生成风险分析记录")
+    @Operation(summary = "根据药品信息执行规则化风险分析")
     public Result<AiRiskAnalysisRecordVO> analyze(@Valid @RequestBody AiRiskAnalysisRecordDTO dto) {
-        DrugInfo drugInfo = drugInfoService.getById(dto.getDrugId());
-        if (drugInfo == null) {
+        AiRiskAnalysisRecordVO vo = riskAnalysisService.analyzeDrugRisk(dto.getDrugId());
+        if (vo == null) {
             return Result.error(404, "药品不存在");
         }
+        return Result.success("分析成功", vo);
+    }
 
-        AiRiskAnalysisRecord record = convertToEntity(dto);
-        generateAnalysisContent(record);
-
-        if (aiRiskAnalysisRecordService.save(record)) {
-            return Result.success("分析成功", convertToVO(record));
-        }
-        return Result.error(500, "分析失败");
+    @GetMapping("/{drugId}/source-analysis")
+    @Operation(summary = "按固定规则汇总药品的 FRDB 原始来源证据，不生成临床风险评分")
+    public Result<Map<String, Object>> sourceAnalysis(@PathVariable Long drugId) {
+        Map<String, Object> result = sourceEvidenceAnalysisService.analyze(drugId);
+        return result == null
+                ? Result.error(404, "未找到该药品的 FRDB 来源记录")
+                : Result.success("分析成功", result);
     }
 
     @GetMapping("/{id}")

@@ -13,17 +13,25 @@ import java.util.Map;
 @Slf4j
 public class JwtUtil {
 
-    /**
-     * JWT 密钥，生产环境应通过配置文件或环境变量注入
-     */
-    private static final String SECRET = "drug-safety-system-secret-key-2026-intelligent-medical-engineering";
+    /** Signing key is supplied by the local environment and is never stored in source. */
+    private static final SecretKey KEY = loadSigningKey();
 
     /**
      * Token 有效期：24小时
      */
     private static final long EXPIRATION = 24 * 60 * 60 * 1000;
 
-    private static final SecretKey KEY = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+    private static SecretKey loadSigningKey() {
+        String secret = System.getenv("JWT_SECRET");
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException("JWT_SECRET 环境变量未设置");
+        }
+        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("JWT_SECRET 至少需要 32 个 UTF-8 字节");
+        }
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
 
     /**
      * 生成 JWT Token

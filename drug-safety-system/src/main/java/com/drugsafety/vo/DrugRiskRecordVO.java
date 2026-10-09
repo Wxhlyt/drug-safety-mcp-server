@@ -26,6 +26,9 @@ public class DrugRiskRecordVO {
     @Schema(description = "药品ID")
     private Long drugId;
 
+    @Schema(description = "药品名称")
+    private String drugName;
+
     /**
      * 风险等级
      */

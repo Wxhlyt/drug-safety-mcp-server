@@ -25,6 +25,9 @@ public class AdverseReactionRecordVO {
     @Schema(description = "药品ID")
     private Long drugId;
 
+    @Schema(description = "药品名称")
+    private String drugName;
+
     /**
      * 不良反应名称
      */
